@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Teleprompter</title>
+
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Teleprompter" />
+  <meta name="theme-color" content="#000000" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f2f2f7;
+      color: #111;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      overscroll-behavior: none;
+    }
+
+    #setup {
+      padding:
+        max(20px, env(safe-area-inset-top))
+        20px
+        max(20px, env(safe-area-inset-bottom))
+        20px;
+      max-width: 900px;
+      margin: 0 auto;
+      height: 100%;
+      overflow: auto;
+    }
+
+    h2 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 18px;
+      color: #111;
+    }
+
+    .sub {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 18px;
+    }
+
+    label {
+      font-size: 13px;
+      color: #555;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 220px;
+      font-size: 18px;
+      padding: 14px;
+      border: 1px solid #ccc;
+      border-radius: 16px;
+      font-family: inherit;
+      resize: vertical;
+      background: #fff;
+      color: #111;
+      margin-bottom: 18px;
+    }
+
+    .row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .field {
+      flex: 1;
+      min-width: 220px;
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px;
+      border: 1px solid #ddd;
+    }
+
+    .field span {
+      font-size: 16px;
+      font-weight: 700;
+      color: #111;
+    }
+
+    .field input[type=range] {
+      width: 100%;
+      margin-top: 10px;
+      height: 36px;
+    }
+
+    #startBtn {
+      width: 100%;
+      padding: 16px;
+      font-size: 18px;
+      font-weight: 700;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+    }
+
+    #prompter {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    #text {
+      color: #fff;
+      line-height: 1.7;
+      padding:
+        60vh
+        32px
+        calc(60vh + env(safe-area-inset-bottom))
+        32px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      transform: scaleX(-1) translateY(0);
+      will-change: transform;
+    }
+
+    #controls {
+      position: fixed;
+      left: 50%;
+      bottom: calc(24px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      z-index: 20;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    #controls button {
+      padding: 14px 22px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      background: rgba(255,255,255,0.16);
+      color: #fff;
+      backdrop-filter: blur(10px);
+      min-width: 120px;
+    }
+
+    #hint {
+      position: fixed;
+      top: calc(16px + env(safe-area-inset-top));
+      right: 16px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+      z-index: 20;
+      text-align: right;
+    }
+
+    #topFade, #bottomFade {
+      position: fixed;
+      left: 0;
+      width: 100%;
+      height: 18vh;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    #topFade {
+      top: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.92), rgba(0,0,0,0));
+    }
+
+    #bottomFade {
+      bottom: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0));
+    }
+  </style>
+</head>
+<body>
+
+  <div id="setup">
+    <h2>Teleprompter</h2>
+    <div class="sub">Fungerer fint i Safari på iPad. Du kan legge den på Hjem-skjermen.</div>
+
+    <label for="inputText">Lim inn teksten din</label>
+    <textarea id="inputText" placeholder="Skriv eller lim inn teksten her..."></textarea>
+
+    <div class="row">
+      <div class="field">
+        <label for="fontSize">Skriftstørrelse: <span id="sizeVal">52</span> px</label>
+        <input type="range" min="24" max="120" value="52" id="fontSize" step="2" />
+      </div>
+
+      <div class="field">
+        <label for="speed">Hastighet: <span id="speedVal">3</span></label>
+        <input type="range" min="1" max="10" value="3" id="speed" step="1" />
+      </div>
+    </div>
+
+    <button id="startBtn">Start teleprompter</button>
+  </div>
+
+  <div id="prompter">
+    <div id="topFade"></div>
+    <div id="bottomFade"></div>
+    <div id="text"></div>
+
+    <div id="controls">
+      <button id="toggleBtn">⏸ Pause</button>
+      <button id="restartBtn">↺ Start på nytt</button>
+      <button id="stopBtn">✕ Avslutt</button>
+    </div>
+
+    <div id="hint">Trykk hvor som helst for pause/play</div>
+  </div>
+
+  <script>
+    const inputText = document.getElementById('inputText');
+    const fontSizeInput = document.getElementById('fontSize');
+    const speedInput = document.getElementById('speed');
+    const sizeVal = document.getElementById('sizeVal');
+    const speedVal = document.getElementById('speedVal');
+    const textEl = document.getElementById('text');
+    const setupEl = document.getElementById('setup');
+    const prompterEl = document.getElementById('prompter');
+    const toggleBtn = document.getElementById('toggleBtn');
+
+    let animId = null;
+    let running = false;
+    let pos = 0;
+    let lastTs = null;
+
+    inputText.value = localStorage.getItem('tp_text') || '';
+    fontSizeInput.value = localStorage.getItem('tp_size') || '52';
+    speedInput.value = localStorage.getItem('tp_speed') || '3';
+    sizeVal.textContent = fontSizeInput.value;
+    speedVal.textContent = speedInput.value;
+
+    function saveSettings() {
+      localStorage.setItem('tp_text', inputText.value);
+      localStorage.setItem('tp_size', fontSizeInput.value);
+      localStorage.setItem('tp_speed', speedInput.value);
+    }
+
+    inputText.addEventListener('input', saveSettings);
+
+    fontSizeInput.addEventListener('input', () => {
+      sizeVal.textContent = fontSizeInput.value;
+      saveSettings();
+      textEl.style.fontSize = fontSizeInput.value + 'px';
+    });
+
+    speedInput.addEventListener('input', () => {
+      speedVal.textContent = speedInput.value;
+      saveSettings();
+    });
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+      const txt = inputText.value.trim();
+      if (!txt) return;
+
+      saveSettings();
+
+      textEl.textContent = txt;
+      textEl.style.fontSize = fontSizeInput.value + 'px';
+
+      pos = 0;
+      lastTs = null;
+      running = true;
+
+      prompterEl.style.display = 'block';
+      setupEl.style.display = 'none';
+
+      startScroll();
+    });
+
+    function frame(ts) {
+      if (lastTs === null) lastTs = ts;
+      const dt = (ts - lastTs) / 16.67;
+      lastTs = ts;
+
+      if (running) {
+        pos += parseFloat(speedInput.value) * 0.45 * dt;
+      }
+
+      textEl.style.transform = `scaleX(-1) translateY(-${pos}px)`;
+      animId = requestAnimationFrame(frame);
+    }
+
+    function startScroll() {
+      cancelAnimationFrame(animId);
+      animId = requestAnimationFrame(frame);
+    }
+
+    function togglePause() {
+      running = !running;
+      toggleBtn.textContent = running ? '⏸ Pause' : '▶ Spill';
+      lastTs = null;
+    }
+
+    function stopPrompter() {
+      cancelAnimationFrame(animId);
+      prompterEl.style.display = 'none';
+      setupEl.style.display = 'block';
+      pos = 0;
+      running = false;
+      lastTs = null;
+    }
+
+    function restartPrompter() {
+      pos = 0;
+      running = true;
+      lastTs = null;
+      toggleBtn.textContent = '⏸ Pause';
+    }
+
+    prompterEl.addEventListener('click', (e) => {
+      if (e.target.closest('#controls')) return;
+      togglePause();
+    });
+
+    toggleBtn.addEventListener('click', togglePause);
+    document.getElementById('stopBtn').addEventListener('click', stopPrompter);
+    document.getElementById('restartBtn').addEventListener('click', restartPrompter);
+
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (event) {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, { passive: false });
+  </script>
+</body>
+</html>
